@@ -260,7 +260,9 @@ nvk_get_device_extensions(const struct nvk_instance *instance,
       .EXT_global_priority = true,
       .EXT_global_priority_query = true,
       .EXT_graphics_pipeline_library = true,
+#ifdef NVK_USE_WSI_PLATFORM
       .EXT_hdr_metadata = true,
+#endif
       .EXT_host_query_reset = true,
       .EXT_host_image_copy = info->cls_eng3d >= TURING_A,
       .EXT_image_2d_view_of_3d = true,
