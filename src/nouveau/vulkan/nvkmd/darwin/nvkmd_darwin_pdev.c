@@ -104,10 +104,13 @@ get_fw_dir(char *buf, size_t size)
    }
 }
 
-VkResult
-nvkmd_darwin_try_create_pdev(struct vk_object_base *log_obj,
-                             enum nvk_debug debug_flags,
-                             struct nvkmd_pdev **pdev_out)
+static simple_mtx_t nvkmd_darwin_pdev_mutex = SIMPLE_MTX_INITIALIZER;
+static struct nvkmd_darwin_pdev *nvkmd_darwin_pdev_shared;
+
+static VkResult
+nvkmd_darwin_create_pdev(struct vk_object_base *log_obj,
+                         enum nvk_debug debug_flags,
+                         struct nvkmd_darwin_pdev **pdev_out)
 {
    struct nvkmd_darwin_pdev *pdev = CALLOC_STRUCT(nvkmd_darwin_pdev);
    if (pdev == NULL)
@@ -164,16 +167,44 @@ nvkmd_darwin_try_create_pdev(struct vk_object_base *log_obj,
 
    nvkmd_darwin_init_sync_types(pdev);
    pdev->base.sync_types = pdev->sync_types;
+   pdev->refcount = 1;
 
-   *pdev_out = &pdev->base;
+   *pdev_out = pdev;
 
    return VK_SUCCESS;
+}
+
+VkResult
+nvkmd_darwin_try_create_pdev(struct vk_object_base *log_obj,
+                             enum nvk_debug debug_flags,
+                             struct nvkmd_pdev **pdev_out)
+{
+   VkResult result = VK_SUCCESS;
+
+   simple_mtx_lock(&nvkmd_darwin_pdev_mutex);
+   if (nvkmd_darwin_pdev_shared != NULL)
+      nvkmd_darwin_pdev_shared->refcount++;
+   else
+      result = nvkmd_darwin_create_pdev(log_obj, debug_flags,
+                                        &nvkmd_darwin_pdev_shared);
+   if (result == VK_SUCCESS)
+      *pdev_out = &nvkmd_darwin_pdev_shared->base;
+   simple_mtx_unlock(&nvkmd_darwin_pdev_mutex);
+
+   return result;
 }
 
 static void
 nvkmd_darwin_pdev_destroy(struct nvkmd_pdev *_pdev)
 {
    struct nvkmd_darwin_pdev *pdev = nvkmd_darwin_pdev(_pdev);
+
+   simple_mtx_lock(&nvkmd_darwin_pdev_mutex);
+   if (--pdev->refcount > 0) {
+      simple_mtx_unlock(&nvkmd_darwin_pdev_mutex);
+      return;
+   }
+   nvkmd_darwin_pdev_shared = NULL;
 
    nvkmd_darwin_sem_finish(pdev);
    util_vma_heap_finish(&pdev->heap);
@@ -185,6 +216,7 @@ nvkmd_darwin_pdev_destroy(struct nvkmd_pdev *_pdev)
    nvrm_dev_close(pdev->rm);
    nvrm_platform_macos_close(&pdev->plat);
    FREE(pdev);
+   simple_mtx_unlock(&nvkmd_darwin_pdev_mutex);
 }
 
 static uint64_t

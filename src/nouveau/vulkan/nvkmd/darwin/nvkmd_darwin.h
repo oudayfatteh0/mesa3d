@@ -30,6 +30,7 @@ struct nvkmd_darwin_sem {
 struct nvkmd_darwin_pdev {
    struct nvkmd_pdev base;
 
+   uint32_t refcount;
    struct nvrm_platform plat;
    struct nvrm_dev *rm;
    simple_mtx_t rm_mutex;
