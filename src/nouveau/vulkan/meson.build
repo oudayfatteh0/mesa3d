@@ -112,7 +112,12 @@ if host_machine.system() == 'darwin'
   dep_nvrm = dependency('nvrm')
   nvk_files += files(
     'nvkmd/darwin/nvkmd_darwin.h',
+    'nvkmd/darwin/nvkmd_darwin_ctx.c',
+    'nvkmd/darwin/nvkmd_darwin_dev.c',
+    'nvkmd/darwin/nvkmd_darwin_mem.c',
     'nvkmd/darwin/nvkmd_darwin_pdev.c',
+    'nvkmd/darwin/nvkmd_darwin_sync.c',
+    'nvkmd/darwin/nvkmd_darwin_va.c',
   )
 endif
 

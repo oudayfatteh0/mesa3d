@@ -140,7 +140,29 @@ nvkmd_darwin_try_create_pdev(struct vk_object_base *log_obj,
    assert(os_page_size <= UINT32_MAX);
    pdev->base.bind_align_B = os_page_size;
 
-   pdev->sync_types[0] = NULL;
+   simple_mtx_init(&pdev->rm_mutex, mtx_plain);
+   simple_mtx_init(&pdev->heap_mutex, mtx_plain);
+   simple_mtx_init(&pdev->sem_mutex, mtx_plain);
+
+   STATIC_ASSERT(NVKMD_DARWIN_HEAP_START >= NVRM_VA_START);
+   STATIC_ASSERT(NVKMD_DARWIN_HEAP_START < NVRM_VA_RESERVED_START);
+   STATIC_ASSERT(NVRM_VA_RESERVED_END < NVKMD_DARWIN_HEAP_END);
+   util_vma_heap_init(&pdev->heap, NVKMD_DARWIN_HEAP_START,
+                      NVKMD_DARWIN_HEAP_END - NVKMD_DARWIN_HEAP_START);
+   ASSERTED bool reserved =
+      util_vma_heap_alloc_addr(&pdev->heap, NVRM_VA_RESERVED_START,
+                               NVRM_VA_RESERVED_END - NVRM_VA_RESERVED_START);
+   assert(reserved);
+
+   STATIC_ASSERT(NVKMD_DARWIN_REPLAY_HEAP_END <= (1ull << 40));
+   util_vma_heap_init(&pdev->replay_heap, NVKMD_DARWIN_REPLAY_HEAP_START,
+                      NVKMD_DARWIN_REPLAY_HEAP_END -
+                      NVKMD_DARWIN_REPLAY_HEAP_START);
+
+   util_dynarray_init(&pdev->sem_chunks, NULL);
+   util_dynarray_init(&pdev->sem_free, NULL);
+
+   nvkmd_darwin_init_sync_types(pdev);
    pdev->base.sync_types = pdev->sync_types;
 
    *pdev_out = &pdev->base;
@@ -152,6 +174,13 @@ static void
 nvkmd_darwin_pdev_destroy(struct nvkmd_pdev *_pdev)
 {
    struct nvkmd_darwin_pdev *pdev = nvkmd_darwin_pdev(_pdev);
+
+   nvkmd_darwin_sem_finish(pdev);
+   util_vma_heap_finish(&pdev->heap);
+   util_vma_heap_finish(&pdev->replay_heap);
+   simple_mtx_destroy(&pdev->sem_mutex);
+   simple_mtx_destroy(&pdev->heap_mutex);
+   simple_mtx_destroy(&pdev->rm_mutex);
 
    nvrm_dev_close(pdev->rm);
    nvrm_platform_macos_close(&pdev->plat);
@@ -168,15 +197,6 @@ static int
 nvkmd_darwin_pdev_get_drm_primary_fd(struct nvkmd_pdev *_pdev)
 {
    return -1;
-}
-
-static VkResult
-nvkmd_darwin_create_dev(struct nvkmd_pdev *_pdev,
-                        struct vk_object_base *log_obj,
-                        struct nvkmd_dev **dev_out)
-{
-   return vk_errorf(log_obj, VK_ERROR_INITIALIZATION_FAILED,
-                    "nvkmd/darwin cannot create devices yet");
 }
 
 const struct nvkmd_pdev_ops nvkmd_darwin_pdev_ops = {
