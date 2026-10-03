@@ -163,6 +163,9 @@ nvk_CreateInstance(const VkInstanceCreateInfo *pCreateInfo,
 
    instance->vk.physical_devices.try_create_for_drm =
       nvk_create_drm_physical_device;
+#if DETECT_OS_APPLE
+   instance->vk.physical_devices.enumerate = nvk_enumerate_physical_devices;
+#endif
    instance->vk.physical_devices.destroy = nvk_physical_device_destroy;
 
    const struct build_id_note *note =
@@ -174,7 +177,8 @@ nvk_CreateInstance(const VkInstanceCreateInfo *pCreateInfo,
    }
 
    unsigned build_id_len = build_id_length(note);
-   if (build_id_len < BUILD_ID_EXPECTED_HASH_LENGTH) {
+   if (build_id_len < (DETECT_OS_APPLE ? VK_UUID_SIZE
+                                       : BUILD_ID_EXPECTED_HASH_LENGTH)) {
       result = vk_errorf(NULL, VK_ERROR_INITIALIZATION_FAILED,
                         "build-id too short.  It needs to be a SHA");
       goto fail_init;

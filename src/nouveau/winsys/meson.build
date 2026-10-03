@@ -1,13 +1,24 @@
-libnouveau_ws = static_library(
-  'nouveau_ws',
-  [
+libnouveau_ws_files = files(
+  'nouveau_device_info.h',
+  'nouveau_device_info.c',
+  'nouveau_private.h',
+)
+
+if dep_libdrm.found()
+  libnouveau_ws_files += files(
     'nouveau_bo.h',
     'nouveau_bo.c',
     'nouveau_context.h',
     'nouveau_context.c',
     'nouveau_device.h',
     'nouveau_device.c',
-    'nouveau_private.h',
+  )
+endif
+
+libnouveau_ws = static_library(
+  'nouveau_ws',
+  [
+    libnouveau_ws_files,
     cl_generated,
   ],
   include_directories : [

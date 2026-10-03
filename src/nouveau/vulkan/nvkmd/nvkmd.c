@@ -4,7 +4,13 @@
  */
 
 #include "nvkmd.h"
+#include "util/detect_os.h"
+#ifdef HAVE_LIBDRM
 #include "nouveau/nvkmd_nouveau.h"
+#endif
+#if DETECT_OS_APPLE
+#include "darwin/nvkmd_darwin.h"
+#endif
 #include "nv_push.h"
 #include "util/cache_ops.h"
 #include "util/u_math.h"
@@ -88,9 +94,23 @@ nvkmd_try_create_pdev_for_drm(struct _drmDevice *drm_device,
                               enum nvk_debug debug_flags,
                               struct nvkmd_pdev **pdev_out)
 {
+#ifdef HAVE_LIBDRM
    return nvkmd_nouveau_try_create_pdev(drm_device, log_obj,
                                         debug_flags, pdev_out);
+#else
+   return VK_ERROR_INCOMPATIBLE_DRIVER;
+#endif
 }
+
+#if DETECT_OS_APPLE
+VkResult
+nvkmd_try_create_pdev_for_darwin(struct vk_object_base *log_obj,
+                                 enum nvk_debug debug_flags,
+                                 struct nvkmd_pdev **pdev_out)
+{
+   return nvkmd_darwin_try_create_pdev(log_obj, debug_flags, pdev_out);
+}
+#endif
 
 VkResult MUST_CHECK
 nvkmd_dev_alloc_mem(struct nvkmd_dev *dev,

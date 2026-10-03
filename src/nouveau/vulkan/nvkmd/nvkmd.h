@@ -385,6 +385,11 @@ nvkmd_try_create_pdev_for_drm(struct _drmDevice *drm_device,
                               enum nvk_debug debug_flags,
                               struct nvkmd_pdev **pdev_out);
 
+VkResult MUST_CHECK
+nvkmd_try_create_pdev_for_darwin(struct vk_object_base *log_obj,
+                                 enum nvk_debug debug_flags,
+                                 struct nvkmd_pdev **pdev_out);
+
 static inline void
 nvkmd_pdev_destroy(struct nvkmd_pdev *pdev)
 {

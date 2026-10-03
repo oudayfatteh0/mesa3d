@@ -97,6 +97,8 @@ VkResult nvk_create_drm_physical_device(struct vk_instance *vk_instance,
                                         struct _drmDevice *drm_device,
                                         struct vk_physical_device **pdev_out);
 
+VkResult nvk_enumerate_physical_devices(struct vk_instance *vk_instance);
+
 void nvk_physical_device_destroy(struct vk_physical_device *vk_device);
 
 VkExtent2D nvk_max_shading_rate(const struct nvk_physical_device *pdev,
